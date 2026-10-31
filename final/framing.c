@@ -21,17 +21,17 @@ int framer_siguiente(struct framer *framer, char *pdu, size_t *len){
         if((framer->buffer[indx] == '\r') &&(framer->buffer[indx + 1] == '\n')){
             //La PDU son los bytes anteriores al \r\n (indx - 1) + el '0'
             memcpy(pdu,framer->buffer, indx);
-            pdu[indx] = '0';
+            pdu[indx] = '\0';
             *len = indx;
             //Y ahora corremos al principio del buffer lo que habia despues del \r\n:
             size_t bytes_restantes = framer->len - (indx + 2);
             memmove(framer->buffer, framer->buffer + indx + 2, bytes_restantes);
             framer->len = bytes_restantes;
-            
+
             return 1;
         }
     }
 
-    return 1;
+    return 0;
 }
 
