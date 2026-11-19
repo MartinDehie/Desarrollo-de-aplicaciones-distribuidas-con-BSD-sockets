@@ -215,9 +215,9 @@ La primera versión de \code{reenviar\_pdu} tenía dos defectos que corregimos a
 
 \section{Pruebas}
 
-Durante el desarrollo probamos el cliente con programas propios que no usan el servidor de la cátedra. No forman
-parte de la entrega, que contiene solo la implementación, pero los resultados respaldan las decisiones de este
-informe.
+Mientras desarrollábamos el cliente no teníamos acceso al servidor de la cátedra, así que lo probamos con programas
+propios que no lo necesitan: pruebas unitarias y un servidor simulado. No forman parte de la entrega, que contiene
+solo la implementación, pero los resultados respaldan las decisiones de este informe.
 
 \subsection{Pruebas unitarias}
 
@@ -234,9 +234,9 @@ dos módulos, todos los casos dieron el resultado esperado.
 \subsection{Prueba de punta a punta con un servidor simulado}
 \label{sec:e2e}
 
-Para probar el cliente completo sin gastar intentos con el servidor de la cátedra escribimos un servidor simulado en
-Python, que lo imita en \code{127.0.0.1} con las credenciales de ejemplo de la consigna (\code{grupo01},
-\code{secreto01}). Verifica la firma de la autenticación y responde primero con una firma inválida, que el cliente
+Como no teníamos acceso al servidor de la cátedra, escribimos con asistencia de inteligencia artificial un servidor
+simulado en Python, para poder probar el cliente completo y avanzar con el desarrollo. Imita al servidor de la
+cátedra en \code{127.0.0.1} con las credenciales de ejemplo de la consigna (\code{grupo01}, \code{secreto01}). Verifica la firma de la autenticación y responde primero con una firma inválida, que el cliente
 tiene que ignorar, y después con el puerto bien firmado. Luego manda por TCP una PDU de cada código y una cola sin
 delimitar, cortando el stream cada 37 bytes con \code{TCP\_NODELAY}, para que haya PDUs partidas y varias por
 segmento. Al final, verifica la PDU, el código y la firma de cada reenvío. La Tabla~\ref{tab:e2e} muestra el
