@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 
-/* Cantidad de bits a rotar en cada una de las 64 operaciones */
+// Bits a rotar en cada una de las 64 operaciones (tabla del RFC)
 static const uint32_t S[64] = {
     7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
     5,  9, 14, 20, 5,  9, 14, 20, 5,  9, 14, 20, 5,  9, 14, 20,
@@ -11,7 +11,7 @@ static const uint32_t S[64] = {
     6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21
 };
 
-/* Constantes de cada operación: K[i] = floor(|sin(i + 1)| * 2^32) */
+// Constantes de cada operación: K[i] = floor(|sin(i + 1)| * 2^32)
 static const uint32_t K[64] = {
     0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee,
     0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
@@ -31,28 +31,19 @@ static const uint32_t K[64] = {
     0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391
 };
 
-/* Rotación circular a izquierda de 32 bits (n nunca es 0 ni 32) */
-static uint32_t rotl(uint32_t x, uint32_t n)
-{
+// Rotación circular a izquierda: los bits que salen por un lado entran por el otro
+static uint32_t rotl(uint32_t x, uint32_t n) {
     return (x << n) | (x >> (32 - n));
 }
 
-/* Procesa un bloque de 64 bytes y actualiza el estado h[4] */
-static void md5_bloque(uint32_t h[4], const unsigned char bloque[64])
-{
-    /* El bloque se interpreta como 16 palabras de 32 bits en little-endian */
-    uint32_t M[16];
-    for (int i = 0; i < 16; i++) {
-        M[i] = (uint32_t)bloque[4 * i]
-             | (uint32_t)bloque[4 * i + 1] << 8
-             | (uint32_t)bloque[4 * i + 2] << 16
-             | (uint32_t)bloque[4 * i + 3] << 24;
-    }
+// Procesa un bloque de 64 bytes y actualiza el estado h
+static void md5_bloque(uint32_t h[4], const unsigned char bloque[64]) {
+    uint32_t M[16]; // Partimos el bloque de 64 bytes en 16 palabras de 32 bits, armadas en little-endian
+    for (int i = 0; i < 16; i++) {M[i] = (uint32_t)bloque[4 * i] | (uint32_t)bloque[4 * i + 1] << 8 | (uint32_t)bloque[4 * i + 2] << 16 | (uint32_t)bloque[4 * i + 3] << 24;}
 
     uint32_t a = h[0], b = h[1], c = h[2], d = h[3];
 
-    /* 4 rondas de 16 operaciones; cada ronda usa una función F, G, H o I
-     * distinta y recorre las palabras M en un orden distinto (g) */
+    // 4 rondas de 16 operaciones. Cada ronda usa otra función (F, G, H, I) y recorre M en otro orden (g)
     for (int i = 0; i < 64; i++) {
         uint32_t f;
         int g;
@@ -60,13 +51,16 @@ static void md5_bloque(uint32_t h[4], const unsigned char bloque[64])
         if (i < 16) {
             f = (b & c) | (~b & d);
             g = i;
-        } else if (i < 32) {
+        } 
+        else if (i < 32) {
             f = (d & b) | (~d & c);
             g = (5 * i + 1) % 16;
-        } else if (i < 48) {
+        } 
+        else if (i < 48) {
             f = b ^ c ^ d;
             g = (3 * i + 5) % 16;
-        } else {
+        } 
+        else {
             f = c ^ (b | ~d);
             g = (7 * i) % 16;
         }
@@ -84,21 +78,16 @@ static void md5_bloque(uint32_t h[4], const unsigned char bloque[64])
     h[3] += d;
 }
 
-void md5_hex(const char *data, size_t len, char hex[33])
-{
+void md5_hex(const char *data, size_t len, char hex[33]) {
     const unsigned char *p = (const unsigned char *)data;
 
-    /* Estado inicial definido por el RFC */
+    // Estado inicial definido por el RFC
     uint32_t h[4] = { 0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476 };
 
-    /* Bloques completos de 64 bytes */
     size_t i;
-    for (i = 0; i + 64 <= len; i += 64)
-        md5_bloque(h, p + i);
+    for (i = 0; i + 64 <= len; i += 64) md5_bloque(h, p + i);
 
-    /* Padding: bytes restantes + 0x80 + ceros hasta que la longitud sea
-     * 56 mod 64 + longitud original en bits (8 bytes en little-endian).
-     * Si al resto no le entran el 0x80 y los 8 bytes, hacen falta 2 bloques. */
+    // Padding: resto + 0x80 + ceros + largo original en bits (8 bytes al final, en little-endian).
     unsigned char ultimo[128] = { 0 };
     size_t resto = len - i;
     memcpy(ultimo, p + i, resto);
@@ -113,7 +102,7 @@ void md5_hex(const char *data, size_t len, char hex[33])
     if (total == 128)
         md5_bloque(h, ultimo + 64);
 
-    /* Salida: h[0..3] en little-endian, 2 dígitos hex por byte */
+    // Salida: h[0..3] en little-endian, 2 dígitos hexadecimales por byte
     static const char digitos[] = "0123456789abcdef";
     for (int j = 0; j < 16; j++) {
         unsigned char byte = (unsigned char)(h[j / 4] >> (8 * (j % 4)));

@@ -1,3 +1,12 @@
 usr_sig.txt
 *.o
 cliente
+.DS_Store
+.Rhistory
+informe/*.aux
+informe/*.log
+informe/*.out
+informe/*.toc
+informe/*.fdb_latexmk
+informe/*.fls
+informe/*.synctex.gz
