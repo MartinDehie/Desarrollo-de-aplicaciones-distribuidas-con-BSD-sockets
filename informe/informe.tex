@@ -467,14 +467,4 @@ Los consejos que dejaríamos a quienes programan con BSD sockets por primera vez
 \item No olvidar \code{htons} y \code{ntohs} para los puertos, y leer las páginas del manual de las secciones 2 y 7
   (\code{man 2 recv}, \code{man 7 socket}, \code{man 7 tcp}) junto con la guía de Beej.
 \end{enumerate}
-
-\section{Uso de herramientas de inteligencia artificial}
-
-Usamos un modelo de inteligencia artificial (Claude, de Anthropic) como asistente para implementar
-\code{validar\_pdu}, revisar y corregir \code{reenviar\_pdu}, escribir las pruebas, reorganizar el \code{main.c}
-original en módulos (\code{credentials}, \code{auth} y \code{forward}), revisar todo el código función por función,
-limpiar el repositorio, diagnosticar el problema de red y tomar la captura final, y redactar y corregir este
-informe. Las cifras del informe salen de ejecuciones reales del código, de la corrida del checkpoint y de
-\code{Final.pcapng}. Las pruebas con el servidor simulado se hicieron únicamente en \code{127.0.0.1}.
-
 \end{document}
