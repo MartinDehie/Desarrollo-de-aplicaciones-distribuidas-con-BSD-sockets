@@ -9,7 +9,7 @@
 #include <unistd.h>
 
 #include "framing.h"
-#include "md5.h"
+#include "md5_hex.h"
 #include "pdu.h"
 
 // Peor caso: usuario (63) + PDU (hasta FRAMER_CAPACIDAD - 2) + pipes, código y secreto o firma (hasta 69)

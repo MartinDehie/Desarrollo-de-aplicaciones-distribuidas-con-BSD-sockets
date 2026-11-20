@@ -7,40 +7,92 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/time.h>
-#include <time.h>
 #include <unistd.h>
 
-#include "md5.h"
+#include "md5_hex.h"
 
 #define MAX_MSG 512
 #define FIRMA_ERROR "00000000000000000000000000000000"
 
-// Milisegundos de un reloj que solo avanza (independiente del sistema)
-static long ahora_ms(void) {
-    struct timespec t;
-    clock_gettime(CLOCK_MONOTONIC, &t);
-    return t.tv_sec * 1000 + t.tv_nsec / 1000000;
+/*
+Provista por la cátedra (codigo_ayuda/test_skip_single.c).
+Skip the characters until the SINGLE DELIMITER character is found
+0-terminate resulting word
+Advance pointer to buffer to the last skipped position + delimiter.
+Return found 0-terminated word.
+*/
+static char *skip_single(char **buf, const char *delimiters)
+{
+  char *p, *begin_word, *end_word, *end_delimiters;
+
+  begin_word = *buf;
+
+  end_word = begin_word + strcspn(begin_word, delimiters);
+
+  // Take only ONE delimiter
+  end_delimiters = end_word + 1;
+
+  for (p = end_word; p < end_delimiters; p++) {
+    *p = '\0';
+  }
+
+  *buf = end_delimiters;
+
+  return begin_word;
+}
+
+/*
+Provista por la cátedra (codigo_ayuda/unixtimestamp.c).
+Subtract the `struct timeval' values X and Y, storing the result in RESULT.
+Return 1 if the difference is negative, otherwise 0.
+From: https://ftp.gnu.org/old-gnu/Manuals/glibc-2.2.5/html_node/Elapsed-Time.html
+*/
+static int timeval_subtract (struct timeval *result, struct timeval *x, struct timeval *y)
+{
+    // preserve *y
+  struct timeval yy = *y;
+  y = &yy;
+
+  /* Perform the carry for the later subtraction by updating y. */
+  if (x->tv_usec < y->tv_usec) {
+    int nsec = (y->tv_usec - x->tv_usec) / 1000000 + 1;
+    y->tv_usec -= 1000000 * nsec;
+    y->tv_sec += nsec;
+  }
+  if (x->tv_usec - y->tv_usec > 1000000) {
+    int nsec = (x->tv_usec - y->tv_usec) / 1000000;
+    y->tv_usec += 1000000 * nsec;
+    y->tv_sec -= nsec;
+  }
+
+  /* Compute the time remaining to wait.
+     tv_usec is certainly positive. */
+  result->tv_sec = x->tv_sec - y->tv_sec;
+  result->tv_usec = x->tv_usec - y->tv_usec;
+
+  /* Return 1 if result is negative. */
+  return x->tv_sec < y->tv_sec;
 }
 
 enum resultado procesar_respuesta(char *msg, const char *secreto, int *puerto) {
-    // Buscamos los 3 pipes que separan <CODE>|<ACTION>|<TEXT>|<SIGNATURE>. Si falta alguno, se descarta
-    char *p1 = strchr(msg, '|');
-    if (p1 == NULL) return RESP_INVALIDA;
-    char *p2 = strchr(p1 + 1, '|');
-    if (p2 == NULL) return RESP_INVALIDA;
-    char *p3 = strchr(p2 + 1, '|');
-    if (p3 == NULL) return RESP_INVALIDA;
+    // Tienen que estar los 3 pipes que separan <CODE>|<ACTION>|<TEXT>|<SIGNATURE>. Si falta alguno, se descarta.
+    // Se cuenta antes porque skip_single no avisa si no encuentra el delimitador: dejaría el puntero pasado el final del string
+    int pipes = 0;
+    for (const char *q = msg; *q != '\0'; q++) {if (*q == '|') pipes++;}
+    if (pipes < 3) return RESP_INVALIDA;
 
-    const char *firma = p3 + 1;
+    // Cada skip_single pisa un pipe con '\0' y deja p al principio del campo siguiente
+    char *p = msg;
+    const char *code = skip_single(&p, "|");
+    const char *action = skip_single(&p, "|");
+    const char *text = skip_single(&p, "|");
+    const char *firma = p; // Lo que queda después del tercer pipe
 
-    /* La firma esperada es el MD5 de lo recibido hasta el último pipe más el secreto */
+    // La firma esperada es md5(<CODE>|<ACTION>|<TEXT>|<SECRET>)
     char aux[MAX_MSG + MAX_CAMPO];
-    int n = snprintf(aux, sizeof aux, "%.*s%s", (int)(p3 - msg + 1), msg, secreto);
+    int n = snprintf(aux, sizeof aux, "%s|%s|%s|%s", code, action, text, secreto);
     char esperada[33];
     md5_hex(aux, (size_t)n, esperada);
-
-    *p1 = *p2 = *p3 = '\0';
-    const char *code = msg, *action = p1 + 1, *text = p2 + 1;
 
     // Firma válida: la respuesta viene del servidor. Chequeamos formato: 200|Port|<puerto>
     if (strcmp(firma, esperada) == 0) {
@@ -88,28 +140,32 @@ int autenticar(const struct credenciales *c, const char *ip_publica) {
     printf("Enviando:  %s\n", pdu);
     if (sendto(s, pdu, strlen(pdu), 0, (struct sockaddr *)&srv, sizeof srv) < 0) {perror("sendto"); close(s); return -1;} // Falló el envío del datagrama
 
-    long limite = ahora_ms() + TIMEOUT_SEG * 1000;
+    // Momento en que se terminan los 10 s de espera
+    struct timeval limite;
+    gettimeofday(&limite, NULL);
+    limite.tv_sec += TIMEOUT_SEG;
 
     int puerto = -1;
 
     // Esperamos hasta que llegue una respuesta válida, haya un error o se terminen los 10 s
     while (1) {
-        long ms = limite - ahora_ms();
-        
-        // Pasaron 10 s sin respuesta válida
-        if (ms <= 0) {
+        struct timeval ahora, resta;
+        gettimeofday(&ahora, NULL);
+
+        // resta = limite - ahora es lo que queda de los 10 s (timeval_subtract devuelve 1 si es negativa).
+        // También cortamos si da justo 0, porque un SO_RCVTIMEO de 0 significa esperar para siempre
+        if (timeval_subtract(&resta, &limite, &ahora) || (resta.tv_sec == 0 && resta.tv_usec == 0)) {
             fprintf(stderr, "Timeout: no llegó una respuesta válida en %d segundos\n", TIMEOUT_SEG);
             break;
         }
 
         // El timeout de recvfrom es lo que queda de los 10 s
-        struct timeval tv = { ms / 1000, (ms % 1000) * 1000 };
-        setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
+        setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &resta, sizeof resta);
 
         char msg[MAX_MSG];
         ssize_t n = recvfrom(s, msg, sizeof msg - 1, 0, NULL, NULL);
-        
-        // Venció el timeout: volvemos arriba, donde ms ya es <= 0
+
+        // Venció el timeout: volvemos arriba, donde resta ya da negativa o 0
         if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) continue;
         
         // Error de recvfrom

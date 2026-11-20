@@ -1,12 +1,9 @@
-#ifndef MD5_H
-#define MD5_H
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
 
-#include <stddef.h>
+// Macro to perform a left circular shift
+#define LEFTROTATE(x, c) (((x) << (c)) | ((x) >> (32 - (c))))
 
-/*
-Calcula el MD5 (RFC 1321, implementación propia) de los len bytes de data y lo escribe en hex como string de
-32 caracteres en minúscula terminado en '\0'. Se usa para firmar: md5(mensaje|secreto).
-*/
-void md5_hex(const char *data, size_t len, char hex[33]);
-
-#endif
+void md5(const uint8_t *initial_msg, size_t initial_len, uint8_t *digest);

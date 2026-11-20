@@ -57,10 +57,12 @@ Las instrucciones de compilación y uso están en el \code{README.md} del reposi
 
 \section{Estructura del cliente}
 
-El código del TP completo está en \code{src/} y se divide en ocho módulos (Tabla~\ref{tab:modulos}). Ninguno usa
-bibliotecas externas: el HTTP y el MD5 están implementados sobre la biblioteca estándar y los sockets, como pide la
-consigna. La descripción de cada función pública está en su \code{.h}. La Figura~\ref{fig:secuencia} muestra el
-recorrido completo de los mensajes.
+El código del TP completo está en \code{src/} y se divide en nueve módulos (Tabla~\ref{tab:modulos}). Ninguno usa
+bibliotecas externas, como pide la consigna: el HTTP está implementado sobre la biblioteca estándar y los sockets, y
+el MD5 es la implementación en C que la cátedra brindó como código de ayuda. Del mismo código de ayuda tomamos dos
+funciones para el primer desafío, \code{skip\_single} y \code{timeval\_subtract} (Sección~\ref{sec:auth}). La
+descripción de cada función pública está en su \code{.h}. La Figura~\ref{fig:secuencia} muestra el recorrido
+completo de los mensajes.
 
 \begin{table}[h]
 \centering\small
@@ -70,10 +72,11 @@ Archivo & Responsabilidad \\
 \midrule
 \code{main.c} & Encadena los pasos: credenciales, IP pública, autenticación y reenvío. \\
 \code{credentials.c} & Lee y valida el archivo de credenciales (IP del servidor, usuario y secreto). \\
-\code{auth.c} & Primer desafío: pide el puerto TCP por UDP y verifica la firma de la respuesta. \\
+\code{auth.c} & Primer desafío: pide el puerto TCP por UDP y verifica la firma de la respuesta. Incluye \code{skip\_single} y \code{timeval\_subtract} del código de ayuda de la cátedra. \\
 \code{forward.c} & Segundo desafío: recibe el stream TCP, delimita y valida cada PDU y la reenvía firmada por UDP. \\
 \code{http\_ip.c} & Obtiene la IP pública con un \code{GET / HTTP/1.0} a \code{api.ipify.org} sobre un socket TCP. \\
-\code{md5.c} & Implementación propia de MD5, con salida en hexadecimal en minúscula. \\
+\code{md5.c} & Implementación de MD5 del código de ayuda de la cátedra, sin modificaciones. Devuelve los 16 bytes del digesto. \\
+\code{md5\_hex.c} & Calcula el MD5 con \code{md5.c} y lo convierte en los 32 caracteres hexadecimales en minúscula que usan las firmas. \\
 \code{framing.c} & Acumula los bytes del stream TCP y extrae las PDUs completas, delimitadas por \crlf. \\
 \code{pdu.c} & Valida una PDU ya delimitada y devuelve su código de parseo (200, 400 o 405 a 410). \\
 \bottomrule
@@ -127,19 +130,29 @@ la línea vacía (\code{\textbackslash r\textbackslash n\textbackslash r\textbac
 \textbf{Firma.} El mensaje es \code{<USERNAME>|<IPv4ADDRESS>|<SIGNATURE>}, donde la firma es el MD5 en hexadecimal
 de \code{<USERNAME>|<IPv4ADDRESS>|<SECRET>}. El secreto entra en el digesto pero nunca viaja, y el servidor, que
 también lo conoce, puede recalcular la firma y comprobar que el mensaje viene de quien dice. La respuesta se
-verifica de la misma forma.
+verifica de la misma forma. El digesto lo calcula la función \code{md5} de la cátedra, que devuelve 16 bytes, y
+\code{md5\_hex} los convierte en los 32 caracteres hexadecimales en minúscula que pide la consigna.
 
 \textbf{Espera de la respuesta.} La consigna pide esperar 10 segundos y descartar en silencio las respuestas mal
 firmadas. Un \code{SO\_RCVTIMEO} fijo de 10 segundos no alcanza: el timeout es por llamada, así que cada datagrama
 inválido reiniciaría la espera y una sucesión de respuestas inválidas la extendería sin límite. Por eso la función
-\code{autenticar} fija un \textbf{plazo absoluto} con \code{CLOCK\_MONOTONIC} y, antes de cada \code{recvfrom},
-recalcula el timeout con lo que falta para ese plazo.
+\code{autenticar} fija un \textbf{plazo absoluto}: la hora de \code{gettimeofday} más 10 segundos. Antes de cada
+\code{recvfrom}, calcula con \code{timeval\_subtract}, tomada del código de ayuda de la cátedra, cuánto falta para ese
+plazo y lo usa como timeout. Si la resta da negativa o exactamente cero, la espera terminó. El cero se trata aparte
+porque un \code{SO\_RCVTIMEO} de 0 no significa ``no esperar'', sino esperar sin límite. Como \code{gettimeofday} da
+la hora del sistema, un ajuste del reloj justo durante esos 10 segundos alargaría o acortaría la espera; con un plazo
+tan corto, no lo consideramos un problema.
 
 \textbf{Verificación de la respuesta.} Cada respuesta pasa por \code{procesar\_respuesta}, que separa los cuatro
-campos, verifica la firma y solo acepta \code{200|Port|<puerto>} con un puerto entre 1 y 65535. Los pipes se buscan
-con \code{strchr} y no con \code{strtok}, porque \code{strtok} se saltea los campos vacíos; un pipe de más queda
-dentro de la firma y la invalida. Una respuesta \code{4xx} con la firma de 32 ceros se informa como error y termina
-el programa. Cualquier otra respuesta se descarta.
+campos, verifica la firma y solo acepta \code{200|Port|<puerto>} con un puerto entre 1 y 65535. Los campos se
+separan con \code{skip\_single}, del código de ayuda de la cátedra: corta en el primer pipe, lo reemplaza por
+\code{'\textbackslash 0'} y avanza al campo siguiente. A diferencia de \code{strtok}, toma un solo delimitador por
+vez, así que respeta los campos vacíos; un pipe de más queda dentro de la firma y la invalida. Lo que
+\code{skip\_single} no hace es avisar cuando no encuentra el pipe: en ese caso deja el puntero después del final del
+string, y la lectura siguiente se sale del buffer. Por eso \code{procesar\_respuesta} primero cuenta que haya al
+menos tres pipes y, si faltan, descarta la respuesta (Sección~\ref{sec:pruebas-catedra}). Con los campos ya
+separados, la firma esperada es el MD5 de \code{<CODE>|<ACTION>|<TEXT>|<SECRET>}. Una respuesta \code{4xx} con la
+firma de 32 ceros se informa como error y termina el programa. Cualquier otra respuesta se descarta.
 
 \section{Segundo desafío: framing, validación y reenvío}
 
@@ -273,11 +286,51 @@ interpretación distinta de la de la cátedra: valida que el cliente hace lo que
 con lo que espera la cátedra. Eso solo lo confirma la corrida contra el servidor de la cátedra
 (Sección~\ref{sec:capturas}).
 
+\subsection{Pruebas del cambio al código de ayuda de la cátedra}
+\label{sec:pruebas-catedra}
+
+Cuando la cátedra brindó su código de ayuda, reemplazamos por él las partes del primer desafío que habíamos resuelto
+con código propio: el MD5, la separación de los campos de la respuesta y el cálculo del tiempo que falta para el
+plazo. El segundo desafío no cambió. Para verificar el reemplazo escribimos, también con asistencia de inteligencia
+artificial, las pruebas de la Tabla~\ref{tab:catedra}, que no necesitan el servidor de la cátedra.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{3.4cm} >{\raggedright\arraybackslash}X c@{}}
+\toprule
+Qué se probó & Casos & Resultado \\
+\midrule
+MD5 & El MD5 de la cátedra contra nuestra implementación anterior y contra \code{hashlib} de Python: los dos ejemplos
+  de la consigna, el del código de ayuda y mensajes de todos los largos entre 0 y 200 bytes, que incluyen los bordes
+  del relleno (55, 56 y 64 bytes). & 204/204 \\
+\code{procesar\_respuesta} & La respuesta del ejemplo de la consigna; puertos 1 y 65535; errores 400 y 401 firmados
+  con ceros y un 401 con otra firma; firma alterada; puertos 0, 65536, vacío y con letras; código o acción
+  distintos; un campo de más; respuestas sin uno, dos o los tres pipes; solo pipes, y la respuesta vacía. & 19/19 \\
+\code{autenticar} & Contra un servidor UDP simulado en \code{127.0.0.1}, que además verifica que el pedido sea el del
+  ejemplo de la consigna: respuesta válida; basura y respuestas mal firmadas antes de la válida; error 401; sin
+  respuesta, y respuestas mal firmadas a los 3 y a los 6 segundos. En los dos últimos casos el cliente terminó a los
+  10,05 s: el plazo es total y no se reinicia con cada datagrama. & 5/5 \\
+\bottomrule
+\end{tabularx}
+\caption{Pruebas del primer desafío después de pasar al código de ayuda de la cátedra.}
+\label{tab:catedra}
+\end{table}
+
+Las pruebas de \code{procesar\_respuesta} se compilaron con AddressSanitizer, y cada respuesta se copió a un buffer
+del tamaño justo para que cualquier lectura por fuera del string quede en evidencia. Así comprobamos que el conteo de
+pipes es necesario: si se lo quita, las respuestas a las que les falta algún pipe hacen que se lea fuera del buffer,
+y AddressSanitizer lo reporta.
+
+Por último, corrimos el cliente contra el servidor de la cátedra. Se autenticó, recibió el puerto 30075 y procesó
+las 10 PDUs con los mismos resultados que en la corrida de la Sección~\ref{sec:capturas}.
+
 \section{Capturas}
 \label{sec:capturas}
 
 La captura del TP completo está en \code{capturas/Final.pcapng}. La tomamos con Wireshark, capturando en todas las interfaces
-con el filtro \code{host 167.114.129.206} para dejar afuera el resto del tráfico.
+con el filtro \code{host 167.114.129.206} para dejar afuera el resto del tráfico. Es de una corrida anterior al
+cambio al código de ayuda de la cátedra (Sección~\ref{sec:pruebas-catedra}), pero el cambio no altera los bytes que
+envía el cliente: con los mismos datos, el MD5 de la cátedra da las mismas firmas que el nuestro.
 
 Desde la red Wi-Fi de la universidad el servidor no respondía la autenticación, probablemente por los filtros de
 tráfico que menciona la consigna, así que la corrida final salió por una VPN (Tailscale). Por eso el cliente aparece
