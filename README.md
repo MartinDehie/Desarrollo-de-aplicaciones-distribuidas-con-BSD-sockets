@@ -62,7 +62,7 @@ Desde la raiz del repositorio, con `usr_sig.txt` en la misma carpeta:
 
 El cliente muestra cada paso: la IP publica, el pedido de autenticacion, el puerto TCP asignado y, por cada PDU
 recibida, su contenido y el codigo con el que se reenvio (o la razon por la que no se reenvio). Termina con codigo
-de salida 0 si completo los dos desafios, y distinto de 0 si hubo un error (su motivo se imprime en `stderr`).
+de salida 0 si completo los dos desafios o distinto de 0 si hubo un error (su motivo se imprime en `stderr`).
 
 La autenticacion usa UDP en el puerto 20262 y el segundo desafio usa un puerto TCP no estandar.
 
@@ -70,22 +70,27 @@ La autenticacion usa UDP en el puerto 20262 y el segundo desafio usa un puerto T
 
 | Carpeta o archivo | Contenido |
 |---|---|
-| `src/` | Cadigo fuente del cliente |
-| `Makefile` | Compilacian del cliente |
+| `src/` | Código fuente del cliente |
+| `Makefile` | Compilación del cliente |
 | `informe/` | Informe en LaTeX (`informe.tex`) y en PDF (`informe.pdf`) |
 | `capturas/` | Captura de Wireshark de la corrida contra el servidor de la cátedra (`Final.pcapng`) e imagenes usadas en el informe |
 | `codigo_ayuda_2026s1/` | Codigo de ayuda dado por la catedra, como referencia. El cliente usa su MD5 y 2 de sus funciones |
 
-### Modulos de `src/`
+## Estructura del cliente
+
+El código está en `src/` y se divide en nueve módulos. Ninguno usa bibliotecas externas, como pide la consigna: el
+HTTP está implementado sobre la biblioteca estándar y la interfaz de sockets. El MD5 es la implementación en C que
+la cátedra dio como código de ayuda. Del mismo código de ayuda se tomaron dos funciones para el primer desafío,
+`skip_single` y `timeval_subtract`. La descripción de cada función pública está en su `.h`.
 
 | Archivo | Responsabilidad |
 |---|---|
-| `main.c` | Encadena los pasos: credenciales, IP publica, autenticacion y reenvio |
-| `credentials.c/.h` | Lectura del archivo de credenciales |
-| `http_ip.c/.h` | IP publica con un `GET / HTTP/1.0` a `api.ipify.org` sobre un socket TCP |
-| `auth.c/.h` | Primer desafo: autenticacion por UDP y verificacion de la respuesta |
-| `md5.c/.h` | MD5 del codigo de ayuda de la catedra, sin modificaciones |
-| `md5_hex.c/.h` | Conversion del digesto MD5 a 32 caracteres hexadecimales en minuscula |
-| `forward.c/.h` | Segundo desaio: recepcion por TCP, delimitacion, validacion y reenvio por UDP |
-| `framing.c/.h` | Delimitacion de PDUs por `\r\n` sobre el stream TCP |
-| `pdu.c/.h` | Validacion de cada PDU y calculo de su codigo de parseo |
+| `main.c` | Encadena los pasos: credenciales, IP pública, autenticación y reenvío. |
+| `credentials.c/.h` | Lee y valida el archivo de credenciales (IP del servidor, usuario y secreto). |
+| `http_ip.c/.h` | Obtiene la IP pública con un `GET / HTTP/1.0` a `api.ipify.org` sobre un socket TCP. |
+| `auth.c/.h` | Primer desafío: pide el puerto TCP por UDP y verifica la firma de la respuesta. Incluye `skip_single` y `timeval_subtract` del código de ayuda de la cátedra. |
+| `md5.c/.h` | Implementación de MD5 del código de ayuda de la cátedra, sin modificaciones. Devuelve los 16 bytes del digesto. |
+| `md5_hex.c/.h` | Calcula el MD5 con `md5.c` y lo convierte en los 32 caracteres hexadecimales en minúscula que usan las firmas. |
+| `forward.c/.h` | Segundo desafío: recibe el stream TCP, delimita y valida cada PDU y la reenvía firmada por UDP. |
+| `framing.c/.h` | Acumula los bytes del stream TCP y extrae las PDUs completas, delimitadas por `\r\n`. |
+| `pdu.c/.h` | Valida una PDU ya delimitada y devuelve su código de parseo (200, 400 o 405 a 410). |
