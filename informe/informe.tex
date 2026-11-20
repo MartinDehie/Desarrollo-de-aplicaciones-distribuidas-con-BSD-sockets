@@ -35,7 +35,7 @@
 \setlength{\emergencystretch}{2em}
 
 \title{\textbf{TP D: Desarrollo de aplicaciones distribuidas con BSD sockets}\\[4pt]
-  \large i310 Redes y Comunicación --- Universidad de San Andrés}
+  \large i310 Redes y Comunicación - Universidad de San Andrés}
 \author{Grupo 12 (usuario \code{grupo12})\\[2pt]
   Martín De Hie \quad Sol García Pereyra \quad Máximo Barral}
 \date{Noviembre de 2026}
@@ -51,8 +51,7 @@ autentica por UDP con una firma MD5 y obtiene un puerto TCP abierto dinámicamen
 puerto, separa las unidades de datos de protocolo (PDUs, por \textit{Protocol Data Units}) que llegan por el stream
 TCP, valida cada una y la reenvía firmada por UDP junto con su código de parseo.
 
-El informe describe primero la estructura del cliente y cómo resuelve cada desafío, con énfasis en las decisiones
-que la consigna deja abiertas. Después presenta las pruebas, las capturas y las respuestas a las cuatro preguntas.
+En este informe vamos a describir primero la estructura del cliente y cómo resuelve cada desafío. Después, se presentarán las pruebas, las capturas y las respuestas a las cuatro preguntas.
 Las instrucciones de compilación y uso están en el \code{README.md} del repositorio.
 
 \section{Estructura del cliente}
@@ -61,7 +60,7 @@ El código del TP completo está en \code{src/} y se divide en nueve módulos (T
 bibliotecas externas, como pide la consigna: el HTTP está implementado sobre la biblioteca estándar y los sockets, y
 el MD5 es la implementación en C que la cátedra brindó como código de ayuda. Del mismo código de ayuda tomamos dos
 funciones para el primer desafío, \code{skip\_single} y \code{timeval\_subtract} (Sección~\ref{sec:auth}). La
-descripción de cada función pública está en su \code{.h}. La Figura~\ref{fig:secuencia} muestra el recorrido
+descripción de cada función pública está en su correspondiente \code{.h}. La Figura~\ref{fig:secuencia} muestra el recorrido
 completo de los mensajes.
 
 \begin{table}[h]
@@ -130,24 +129,24 @@ la línea vacía (\code{\textbackslash r\textbackslash n\textbackslash r\textbac
 \textbf{Firma.} El mensaje es \code{<USERNAME>|<IPv4ADDRESS>|<SIGNATURE>}, donde la firma es el MD5 en hexadecimal
 de \code{<USERNAME>|<IPv4ADDRESS>|<SECRET>}. El secreto entra en el digesto pero nunca viaja, y el servidor, que
 también lo conoce, puede recalcular la firma y comprobar que el mensaje viene de quien dice. La respuesta se
-verifica de la misma forma. El digesto lo calcula la función \code{md5} de la cátedra, que devuelve 16 bytes, y
-\code{md5\_hex} los convierte en los 32 caracteres hexadecimales en minúscula que pide la consigna.
+verifica de la misma forma. La función \code{md5} de la cátedra calcula el digesto, devolviendo 16 bytes, y
+\code{md5\_hex} los convierte en los 32 caracteres hexadecimales en minúscula.
 
-\textbf{Espera de la respuesta.} La consigna pide esperar 10 segundos y descartar en silencio las respuestas mal
-firmadas. Un \code{SO\_RCVTIMEO} fijo de 10 segundos no alcanza: el timeout es por llamada, así que cada datagrama
+\textbf{Espera de la respuesta.} Para lograr la espera de 10 segundos y descartar en silencio las respuestas mal
+firmadas, un \code{SO\_RCVTIMEO} fijo de 10 segundos no alcanza: el timeout es por llamada, así que cada datagrama
 inválido reiniciaría la espera y una sucesión de respuestas inválidas la extendería sin límite. Por eso la función
-\code{autenticar} fija un \textbf{plazo absoluto}: la hora de \code{gettimeofday} más 10 segundos. Antes de cada
+\code{autenticar} fija un \textbf{plazo absoluto}, el cual esta generado por la hora de \code{gettimeofday} más 10 segundos. Antes de cada
 \code{recvfrom}, calcula con \code{timeval\_subtract}, tomada del código de ayuda de la cátedra, cuánto falta para ese
 plazo y lo usa como timeout. Si la resta da negativa o exactamente cero, la espera terminó. El cero se trata aparte
 porque un \code{SO\_RCVTIMEO} de 0 no significa ``no esperar'', sino esperar sin límite. Como \code{gettimeofday} da
-la hora del sistema, un ajuste del reloj justo durante esos 10 segundos alargaría o acortaría la espera; con un plazo
+la hora del sistema, un ajuste del reloj justo durante esos 10 segundos alargaría o acortaría la espera. Pero con un plazo
 tan corto, no lo consideramos un problema.
 
 \textbf{Verificación de la respuesta.} Cada respuesta pasa por \code{procesar\_respuesta}, que separa los cuatro
 campos, verifica la firma y solo acepta \code{200|Port|<puerto>} con un puerto entre 1 y 65535. Los campos se
 separan con \code{skip\_single}, del código de ayuda de la cátedra: corta en el primer pipe, lo reemplaza por
 \code{'\textbackslash 0'} y avanza al campo siguiente. A diferencia de \code{strtok}, toma un solo delimitador por
-vez, así que respeta los campos vacíos; un pipe de más queda dentro de la firma y la invalida. Lo que
+vez, así que respeta los campos vacíos. Y en el caso de un pipe de más, este queda dentro de la firma y la invalida. Lo que
 \code{skip\_single} no hace es avisar cuando no encuentra el pipe: en ese caso deja el puntero después del final del
 string, y la lectura siguiente se sale del buffer. Por eso \code{procesar\_respuesta} primero cuenta que haya al
 menos tres pipes y, si faltan, descarta la respuesta (Sección~\ref{sec:pruebas-catedra}). Con los campos ya
@@ -168,8 +167,8 @@ siguiente. Cuando lo encuentra, copia la PDU sin el delimitador y corre el resto
 \code{memmove}. No se usa \code{strstr} porque el buffer no termina en \code{'\textbackslash 0'} y puede contener
 ese byte.
 
-Quedan dos casos borde. Si se acumulan 4096 bytes sin un solo \crlf, eso no puede ser una PDU (el máximo es de 122
-bytes), así que se descarta y se sigue con lo nuevo. Si el servidor cierra la conexión con bytes sin delimitar en el
+Además, quedan otros dos casos borde: si se acumulan 4096 bytes sin un solo \crlf, eso no puede ser una PDU (el máximo es de 122
+bytes), así que se descarta y se sigue con lo nuevo. Y si el servidor cierra la conexión con bytes sin delimitar en el
 buffer, esos bytes no se reenvían, porque la consigna pide reenviar solo las PDUs delimitadas.
 
 \subsection{Validación}
@@ -235,7 +234,7 @@ solo la implementación, pero los resultados respaldan las decisiones de este in
 \subsection{Pruebas unitarias}
 
 Probamos \code{validar\_pdu} con los siete ejemplos de la consigna y su timestamp actual, y con ocho casos borde: el
-mensaje de 100 caracteres (200) y el de 101 (410); la antigüedad de 300 s (200) y la de 301 s (406); el timestamp
+mensaje de 100 caracteres (200) y el de 101 (410); la antigüedad de 300s (200) y la de 301s (406); el timestamp
 vacío (400); el \code{\&} dentro del mensaje (408); el carácter \code{\textasciitilde} (0x7E, 408), y el byte
 \code{0x00} en el medio del mensaje (408).
 
@@ -366,11 +365,11 @@ el cliente no puede saber si llegaron (Pregunta~3).
 
 \subsection*{1. ¿Cómo podría mejorar el protocolo para permitir el reenvío de PDUs con el carácter 0x7C?}
 
-Hoy el cliente no reenvía las PDUs que contienen \code{|}, así que el servidor se queda sin su código de parseo. El problema de fondo es que \textbf{el mismo byte cumple dos funciones}: es dato dentro de
+Hoy el cliente no reenvía las PDUs que contienen \code{|}, así que el servidor se queda sin su código de parseo. El problema de fondo es que el mismo byte cumple dos funciones: es dato dentro de
 la PDU y separador entre los campos del datagrama. Vemos cuatro formas de resolverlo, ordenadas de menor a mayor
 cambio en el formato.
 
-\textbf{Parseo posicional, sin cambiar el formato.} El usuario solo admite \code{[0-9A-Za-z]}, el código de parseo
+\textbf{Parseo posicional, sin cambiar el formato:} El usuario solo admite \code{[0-9A-Za-z]}, el código de parseo
 tiene tres dígitos y la firma 32 caracteres hexadecimales, así que ninguno de esos campos puede contener un pipe.
 Por lo tanto, el datagrama deja de ser ambiguo si el receptor corta en el primer pipe y en los dos últimos, y toma
 todo lo que queda en el medio como la PDU. Así parsea los reenvíos nuestro servidor simulado
@@ -378,13 +377,13 @@ todo lo que queda en el medio como la PDU. Así parsea los reenvíos nuestro ser
 tenga un único campo libre: si el protocolo sumara otro, la ambigüedad volvería. Es una propiedad del formato
 actual, no un mecanismo.
 
-\textbf{Byte stuffing.} Es la solución de PPP: un byte de escape, 0x7D, indica que el byte siguiente
+\textbf{Byte stuffing:} Es la solución de PPP: un byte de escape, 0x7D, indica que el byte siguiente
 es especial y viaja con un XOR 0x20. Aplicado acá, el pipe (0x7C) se enviaría como \code{0x7D 0x5C} y el escape mismo
 (\code{\}}, 0x7D) como \code{0x7D 0x5D}. Este último también hay que escaparlo, porque 0x7D es justo el límite
 superior del rango permitido en el mensaje. El costo es un byte por cada aparición, de modo que en el peor caso la
 PDU se duplica (de 122 a 244 bytes).
 
-\textbf{Prefijo de longitud.} El mensaje pasaría a ser
+\textbf{Prefijo de longitud:} El mensaje pasaría a ser
 \begin{center}\code{<USERNAME>|<LARGO>|<PDU>|<PARSE\_CODE>|<SIGNATURE>}\end{center}
 y el receptor leería \code{LARGO} bytes sin mirar su contenido, como hace HTTP con \code{Content-Length}. El costo es fijo: para una PDU de hasta 122 bytes son a lo sumo
 4 bytes (\code{|122}). Además acepta cualquier byte, incluido el \code{0x00} que, como se vio en la
@@ -399,7 +398,7 @@ cualquier byte. Además, es la alternativa clásica al uso de delimitadores, as�
 problema del framing por \crlf{} en TCP.
 
 Con cualquiera de las cuatro opciones, el protocolo tiene que especificar si el MD5 se calcula sobre los bytes
-transmitidos o sobre la PDU original. Recomendamos los transmitidos: así el servidor verifica la firma antes de
+transmitidos o sobre la PDU original. Recomendamos los transmitidos, así el servidor verifica la firma antes de
 decodificar nada que haya llegado de la red.
 
 \subsection*{2. ¿Podría el servidor iniciar la conexión TCP contra las computadoras de los alumnos?}
@@ -409,7 +408,7 @@ solo quién hace la apertura pasiva (\code{listen} y \code{accept}) y quién la 
 programa tendría que crear un socket, hacer \code{bind} a un puerto, \code{listen} y \code{accept}, e informar ese
 puerto en el mensaje de autenticación. El servidor ya conoce la IP pública, porque viaja en ese mismo mensaje.
 
-A nivel de red, en cambio, no funcionaría para la mayoría de los grupos. Nuestra corrida del checkpoint lo muestra:
+En cambio, a nivel de red, no funcionaría para la mayoría de los grupos. Nuestra corrida del checkpoint lo muestra:
 la máquina tenía la dirección privada \code{172.20.10.2} y el servidor la veía como \code{181.9.209.54}. Un NAT crea
 traducciones solo para los flujos que salen de la red interna, así que un SYN entrante dirigido a
 \code{181.9.209.54} no encuentra ninguna traducción y el NAT lo descarta, porque no sabe a qué máquina entregarlo.
@@ -421,7 +420,7 @@ es de otro protocolo y otro puerto, y las técnicas de \textit{hole punching} pa
 cada NAT y no son confiables. A esto se suman los firewalls de los equipos y los filtros de tráfico de las
 redes académicas, que la propia consigna menciona.
 
-El problema ya se resolvió una vez en la historia de Internet. En el modo activo de FTP, el cliente
+Hoy en día, el problema ya se logró resolver: en el modo activo de FTP, el cliente
 anuncia un puerto con el comando \code{PORT} y el servidor abre la conexión de datos hacia él. Ese modo dejó de
 funcionar detrás de firewalls y NATs, y por eso se generalizó el modo pasivo (\code{PASV}), en el que el
 servidor abre un puerto, lo informa y el cliente se conecta. Es exactamente el diseño de este TP:
@@ -431,7 +430,7 @@ Invertir los roles tendría además un costo de seguridad. Un servidor que se co
 un mensaje puede usarse para conectarse a terceros, como en el \textit{FTP bounce attack}. La firma
 limitaría esa posibilidad a los grupos autenticados, pero no la eliminaría.
 
-En síntesis, \textbf{el rol se puede invertir en el código, pero no en la red}.
+En resumen, \textbf{el rol se puede invertir en el código, pero no en la red}.
 
 \subsection*{3. ¿Cómo se vería afectado el funcionamiento de los desafíos ante la pérdida de paquetes?}
 
@@ -444,15 +443,15 @@ recupera. La Tabla~\ref{tab:perdidas} resume el efecto sobre nuestro cliente.
 \toprule
 Etapa & Transporte & Efecto de una pérdida en nuestro cliente \\
 \midrule
-IP pública (ipify) & TCP & Solo demora, por las retransmisiones. El \code{connect} tiene un límite de 5 s y los SYN salen en 0, 1 y 3 s, así que se toleran dos SYN perdidos seguidos. \\
-Autenticación & UDP & Si se pierde el pedido o la respuesta, el cliente espera los 10 s completos y termina con \code{Timeout}. No hay reintento. \\
-Conexión al puerto dinámico & TCP & El puerto escucha 10 s. Los SYN salen en 0, 1, 3 y 7 s, así que se toleran tres pérdidas seguidas. El siguiente saldría a los 15 s, cuando el puerto ya cerró. \\
-Recepción de PDUs & TCP & El stream llega completo y en orden, solo con demora. El framing no se ve afectado. Si una pausa supera los 10 s de \code{SO\_RCVTIMEO}, se corta la recepción y se pierden las PDUs restantes. \\
+IP pública (ipify) & TCP & Solo demora, por las retransmisiones. El \code{connect} tiene un límite de 5s y los SYN salen en 0, 1 y 3s, así que se toleran dos SYN perdidos seguidos. \\
+Autenticación & UDP & Si se pierde el pedido o la respuesta, el cliente espera los 10s completos y termina con \code{Timeout}. No hay reintento. \\
+Conexión al puerto dinámico & TCP & El puerto escucha 10s. Los SYN salen en 0, 1, 3 y 7s, así que se toleran tres pérdidas seguidas. El siguiente saldría a los 15s, cuando el puerto ya cerró. \\
+Recepción de PDUs & TCP & El stream llega completo y en orden, solo con demora. El framing no se ve afectado. Si una pausa supera los 10s de \code{SO\_RCVTIMEO}, se corta la recepción y se pierden las PDUs restantes. \\
 Reenvío de PDUs & UDP & El datagrama se pierde sin aviso: el cliente no puede saberlo y el servidor recibe una PDU menos, así que el desafío falla. \\
 \bottomrule
 \end{tabularx}
 \caption{Efecto de la pérdida de paquetes en cada etapa. Los tiempos de los SYN suponen un tiempo de retransmisión
-(RTO) inicial de 1 s que se duplica en cada intento, como hace Linux.}
+(RTO) inicial de 1s que se duplica en cada intento, como hace Linux.}
 \label{tab:perdidas}
 \end{table}
 
@@ -462,17 +461,17 @@ segmentos no lo afecta. Las retransmisiones incluso pueden cambiar los límites 
 retransmitido puede llevar más datos que el original. Un cliente que supusiera una PDU por segmento fallaría
 justamente en presencia de pérdidas.
 
-Para que una pausa del stream supere nuestro timeout de 10 s hacen falta varias pérdidas consecutivas del mismo
-segmento. Con un RTO del orden de 0,4 s (en la corrida del checkpoint, la autenticación tardó 216 ms en ir y volver,
+Para que una pausa del stream supere nuestro timeout de 10s hacen falta varias pérdidas consecutivas del mismo
+segmento. Con un RTO del orden de 0,4s (en la corrida del checkpoint, la autenticación tardó 216 ms en ir y volver,
 y Linux suma un piso de 200 ms), la espera acumulada tras $k$ intentos fallidos es de aproximadamente
 $0{,}4\,(2^k-1)$ segundos, y supera los 10 s recién con unas cinco pérdidas seguidas. Eso es más propio de un corte
-de enlace que de una pérdida ocasional. Por la misma razón, la ventana de 300 s del timestamp queda muy lejos de
+de enlace que de una pérdida ocasional. Por la misma razón, la ventana de 300s del timestamp queda muy lejos de
 cualquier demora por retransmisión.
 
 En las etapas sobre UDP, la pérdida es definitiva. En la autenticación, el cliente nota la pérdida porque no llega
 respuesta, pero no reintenta. Una mejora razonable sería retransmitir el pedido cada 2 o 3 segundos dentro de los
-10 s. Sería seguro, porque el cliente usa solo la primera respuesta válida, y el puerto extra que abriría el
-servidor se cierra solo a los 10 s.
+10s. Sería seguro, porque el cliente usa solo la primera respuesta válida, y el puerto extra que abriría el
+servidor se cierra solo a los 10s.
 
 El reenvío de PDUs es la etapa más frágil, porque ni siquiera hay una respuesta que falte: \textbf{las PDUs llegan
 de forma confiable por TCP y salen de forma no confiable por UDP}. Mitigarlo exige cambiar el protocolo, por ejemplo
@@ -482,28 +481,25 @@ que el número de secuencia también le serviría al servidor si espera los reen
 
 \subsection*{4. Dificultades, aprendizajes y consejos para futuros alumnos}
 
-\pendiente{Esta respuesta se armó a partir de lo que muestran el código, su historial y las pruebas. Conviene
-completarla con la experiencia propia de cada integrante antes de entregar.}
-
-La primera dificultad conceptual es que \textbf{TCP no entrega mensajes sino bytes}. La tentación inicial es tratar
-cada \code{recv} como una PDU, y el error no se manifiesta en una red local, donde cada envío del servidor suele
+La primera dificultad conceptual es que TCP no entrega mensajes sino bytes. La tentación inicial es tratar
+cada \code{recv} como una PDU, y el error no surge en una red local, donde cada envío del servidor suele
 llegar en un solo \code{recv}. El caso más sutil es el del \crlf{} partido entre dos \code{recv}, que obliga a buscar el
 delimitador en todo lo acumulado y no solo en lo nuevo. Este mismo problema reaparece al leer la respuesta HTTP de
 ipify, que también puede llegar en varios pedazos.
 
-La segunda es que \textbf{en código de red un \code{char *} no es un string}. Las funciones de C que paran en el
+La segunda es que en código de red un \code{char *} no es un string. Las funciones de C que paran en el
 \code{'\textbackslash 0'} (\code{strlen}, \code{strchr}, \code{printf} con \code{\%s}) parecen funcionar hasta que
 llega un byte \code{0x00}. Así fue como la primera versión del reenvío mandaba una PDU truncada con código 200, y lo
 descubrimos recién cuando la prueba de punta a punta incluyó ese caso. La lección es llevar siempre el par
 puntero y largo, y usar \code{memchr} y \code{memcpy}.
 
-La tercera es \textbf{dimensionar los buffers para el peor caso y no para el caso típico}, y conocer bien las
+La tercera es dimensionar los buffers para el peor caso y no para el caso típico, y conocer bien las
 funciones que se usan. \code{snprintf} protege el buffer, pero devuelve el largo que habría escrito, no el que
-escribió; usarlo como largo para \code{sendto} convierte una truncación silenciosa en una lectura fuera del buffer.
+escribió, por lo que usarlo como largo para \code{sendto} convierte una truncación silenciosa en una lectura fuera del buffer.
 Los timeouts tienen una sutileza parecida: \code{SO\_RCVTIMEO} limita cada llamada, no la espera total, y para
-respetar los 10 s de la consigna hubo que trabajar con un plazo absoluto.
+respetar los 10s de la consigna hubo que trabajar con un plazo absoluto.
 
-La cuarta es que \textbf{la red real no es la de la máquina}: la IP de la interfaz no es la que ve el servidor, y
+La cuarta es que la red real no es la de la máquina: la IP de la interfaz no es la que ve el servidor, y
 entender el NAT fue necesario tanto para el primer desafío como para responder la segunda pregunta.
 
 Los consejos que dejaríamos a quienes programan con BSD sockets por primera vez son:
