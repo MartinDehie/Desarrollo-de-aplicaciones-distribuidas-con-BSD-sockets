@@ -1,8 +1,8 @@
 #ifndef PDU_H
 #define PDU_H
 
-#include <stddef.h>
-#include <time.h>
+#include <stddef.h> //para size_t
+#include <time.h> //para time_t
 
 /*
   Valida una PDU ya delimitada, sin el \r\n, con el formato <TIMESTAMP>&<MESSAGE> y devuelve su código de parseo: 200, 400 o 405 a 410.

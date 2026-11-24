@@ -3,6 +3,8 @@
 
 #include <stddef.h>
 
+//No hizo faltar definir las otras 2 funciones presentes en su archivo ".c", porq como su firma tiene "static", se definen como privadas
+
 /*
 Consulta la IP pública a api.ipify.org con un GET HTTP/1.0 escrito a mano sobre un socket TCP (sin bibliotecas HTTP).
 Escribe la IP en Decimal Dot Notation (ej. "8.8.8.8") en ip; ip_len tiene que ser al menos INET_ADDRSTRLEN (16).

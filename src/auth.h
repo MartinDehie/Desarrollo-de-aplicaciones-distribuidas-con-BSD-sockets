@@ -1,9 +1,11 @@
 #ifndef AUTH_H
 #define AUTH_H
 
-#include "credentials.h"
+#include "credentials.h" //de aca vienen tambien el "PUERTO_UDP", "TIMEOUT_SEG" y "MAX+CAMPO"
 
 // Clasificación de una respuesta del servidor
+               // 0                 1             2
+           //descarte silencioso   bien    se avisa y se termina
 enum resultado {RESP_INVALIDA, RESP_PUERTO, RESP_ERROR};
 
 /*
@@ -16,6 +18,9 @@ Clasifica una respuesta del servidor <CODE>|<ACTION>|<TEXT>|<SIGNATURE>, sin el 
 Modifica msg: pisa los pipes con '\0' para separar los campos, así que después de llamarla msg ya no se puede imprimir entero.
 */
 enum resultado procesar_respuesta(char *msg, const char *secreto, int *puerto);
+//No la hicimos static porq o sino el programa de prueba no podria llamarla para chequear su funcionamiento
+
+
 
 /* 
 Primer desafío. 

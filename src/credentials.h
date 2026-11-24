@@ -9,8 +9,9 @@
 
 // Datos del archivo de credenciales que entrega la cátedra
 struct credenciales {
+  //INET_ADDRSTRLEN vale 16 (es lo q mide la IPv4 mas alrga posible: 255.255.255.255 + '\0')
     char servidor[INET_ADDRSTRLEN]; // IPv4 del servidor en Decimal Dot Notation
-    char usuario[MAX_CAMPO];
+    char usuario[MAX_CAMPO]; //"grupo12"
     char secreto[MAX_CAMPO];        // Nunca viaja por la red, solo entra en las firmas
 };
 

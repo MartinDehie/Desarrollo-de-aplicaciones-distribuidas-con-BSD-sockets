@@ -1,7 +1,7 @@
 #ifndef FORWARD_H
 #define FORWARD_H
 
-#include "credentials.h"
+#include "credentials.h" //para struct credenciales, PUERTO_UDP, TIMEOUT_SEG y MAX_CAMPO
 
 /*
 Segundo desafío.
